@@ -2,8 +2,9 @@
 
 ## Goal
 
-Create a TF-IDF Search Index
-Develop a better understanding of Pandas
+1. Create a TF-IDF Search Index
+
+2. Develop a better understanding of Pandas
 
 # Tools
 Django, Bootstrap, Pandas
