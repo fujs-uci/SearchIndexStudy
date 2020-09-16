@@ -4,6 +4,10 @@ from django.db import models
 # downloaded from https://www.kaggle.com/rounakbanik/the-movies-dataset
 
 
+class SearchIndex(models.Model):
+    pass
+
+
 class Movies(models.Model):
     """
     movies_metadata.csv
@@ -18,7 +22,7 @@ class Movies(models.Model):
         db_table = "searchindex_movies"
 
 
-class Genre(models.Model):
+class MovieGenres(models.Model):
     """
     movies_metadata.genres
     """
@@ -30,7 +34,7 @@ class Genre(models.Model):
         db_table = "searchindex_genres"
 
 
-class ProductionCompany(models.Model):
+class ProductionCompanies(models.Model):
     """
     movies_metadata.production_companies
     """
@@ -42,7 +46,7 @@ class ProductionCompany(models.Model):
         db_table = "searchindex_production_companies"
 
 
-class Cast(models.Model):
+class Casts(models.Model):
     """
     credits.cast
     """
@@ -52,10 +56,10 @@ class Cast(models.Model):
     movies = models.ForeignKey('Movies', on_delete=models.CASCADE)
 
     class Meta:
-        db_table = "searchindex_cast"
+        db_table = "searchindex_casts"
 
 
-class Crew(models.Model):
+class Crews(models.Model):
     """
     credits.crew
     """
@@ -66,7 +70,7 @@ class Crew(models.Model):
     movies = models.ForeignKey('Movies', on_delete=models.CASCADE)
 
     class Meta:
-        db_table = "searchindex_crew"
+        db_table = "searchindex_crews"
 
 
 class Keywords(models.Model):
