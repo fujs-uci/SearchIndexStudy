@@ -28,7 +28,7 @@ class Command(BaseCommand):
         """
         df = pd.read_csv(file, low_memory=False)
         if str(list(df.columns)) == self._accepted_columns[num]:
-            return df.replace({np.nan: None})
+            return df.replace({np.nan: ""})
         else:
             raise Exception('Could not match file.')
 
@@ -44,7 +44,8 @@ class Command(BaseCommand):
                                        overview=x[2],
                                        tagline=x[3],
                                        title=x[4]), df))
-        Movies.objects.bulk_create(bc)
+
+        Movies.objects.bulk_create(bc, ignore_conflicts=True)
 
     def _gen_movie_m2m(self, df, object):
         """
@@ -66,8 +67,11 @@ class Command(BaseCommand):
             m_obj = Movies.objects.get(id=int(m_id))
             bc = list(map(lambda x: object(id=x['id'], name=x['name']), pc_list))
 
-            object.objects.bulk_create(bc, ignore_conflics=True)
-            m_obj.add(*object.objects.filter(id__in=pc_id_list))
+            object.objects.bulk_create(bc, ignore_conflicts=True)
+            if object == MovieGenres:
+                m_obj.moviegenres_set.add(*object.objects.filter(id__in=pc_id_list))
+            elif object == ProductionCompanies:
+                m_obj.productioncompanies_set.add(*object.objects.filter(id__in=pc_id_list))
 
     def add_arguments(self, parser):
         """
@@ -90,8 +94,6 @@ class Command(BaseCommand):
             df_movies = self._check(3, options['movies'])
             df_keywords = self._check(1, options['keywords'])
             df_credits = self._check(2, options['credits'])
-
-            # Todo convert these to models
 
             # Bulk create Movies
             self._gen_movies(df_movies[['id', 'original_title', 'overview', 'tagline', 'title']])

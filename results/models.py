@@ -5,7 +5,10 @@ from django.db import models
 
 
 class SearchIndex(models.Model):
-    pass
+    id = models.AutoField(primary_key=True)
+
+    class Meta:
+        db_table = "searchindex"
 
 
 class Movies(models.Model):
