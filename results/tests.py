@@ -1,6 +1,7 @@
 from django.core.management import call_command
 from django.test import TestCase, TransactionTestCase
-from results.models import Movies, MovieGenres, ProductionCompanies
+from results.models import Movies, MovieGenres, ProductionCompanies, Keywords
+from os import path
 
 
 ##############################
@@ -98,16 +99,69 @@ class CommandsTestCase(TransactionTestCase):
     """
     Test manage.py commands
     """
-    def test_load_file(self):
-        """
-        Testing manage.py load_file command
-        Make sure that producing all models from loaded csv files are correct
-        :return: None
-        """
+
+    def setUp(self):
         args = [
-            '--movies=C:\\Users\\fujus\\Documents\\searchindex_project\\dataset\\movies_metadata.csv',
-            '--keywords=C:\\Users\\fujus\\Documents\\searchindex_project\\dataset\\keywords.csv',
-            '--credits=C:\\Users\\fujus\\Documents\\searchindex_project\\dataset\\credits.csv'
+            '--movies=C:\\Users\\fujus\\Documents\\searchindex_project\\dataset\\movies_metadata_test.csv',
+            '--keywords=C:\\Users\\fujus\\Documents\\searchindex_project\\dataset\\keywords_test.csv',
+            '--credits=C:\\Users\\fujus\\Documents\\searchindex_project\\dataset\\credits_test.csv'
         ]
         opts = {}
         call_command('load_file', *args, **opts)
+
+    def test_load_file_movies(self):
+        """
+        Testing manage.py load_file command
+        Make sure that producing all models from --movies loaded csv files are correct
+        :return: None
+        """
+        # first entry in csv file exists
+        movie = Movies.objects.filter(id=862).first()
+        self.assertIsNotNone(movie)
+        # the movie genres are correct
+        movie_genres = movie.moviegenres_set.all()
+        self.assertEquals(movie_genres.count(), 3)
+        self.assertEquals(movie_genres.first().id, 16)
+        # the production companies are correct
+        movie_prodcomp = movie.productioncompanies_set.all()
+        self.assertEquals(movie_prodcomp.count(), 1)
+        self.assertEquals(movie_prodcomp.first().id, 3)
+
+    def test_load_file_keywords(self):
+        """
+        Testing manage.py load_file command
+        Make sure that producing all models from --keywords loaded csv files are correct
+        :return: None
+        """
+        # Movie keywords that exist in csv, exist in database models
+        testing_exist = [
+            (862, 9, 931, "jealousy"),
+            (184402, 2, 154802, "silent film"),
+            (174650, 2, 2626, "exorcism")
+        ]
+        for test_data in testing_exist:
+            movie = Movies.objects.get(id=test_data[0])
+            movie_keywords = movie.keywords_set.all()
+            self.assertEquals(movie_keywords.count(), test_data[1])
+            self.assertEquals(movie_keywords.first().id, test_data[2])
+            self.assertEquals(movie_keywords.first().name, test_data[3])
+        # Movies with no keywords have no keywords in models
+        testing_none = [141210, 117500, 61888]
+        for test_data in testing_none:
+            movie = Movies.objects.get(id=test_data)
+            movie_keywords = movie.keywords_set.all()
+            self.assertEquals(movie_keywords.count(), 0)
+
+    def test_load_file_credits(self):
+        """
+        Testing manage.py load_file command
+        Make sure that producing all models from --credits loaded csv files are correct
+        :return:
+        """
+        # Known record to have cast and crew models
+        movie = Movies.objects.get(id=862)
+        m_cast = movie.casts_set.all()
+        m_crew = movie.crews_set.all()
+
+        self.assertIsNot(m_cast.count(), 0)
+        self.assertIsNot(m_crew.count(), 0)

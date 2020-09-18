@@ -56,7 +56,7 @@ class Casts(models.Model):
     id = models.AutoField(primary_key=True)
     character = models.CharField(max_length=200)
     name = models.CharField(max_length=200)
-    movies = models.ForeignKey('Movies', on_delete=models.CASCADE)
+    movies = models.ManyToManyField('Movies')
 
     class Meta:
         db_table = "searchindex_casts"
@@ -70,7 +70,7 @@ class Crews(models.Model):
     department = models.CharField(max_length=150)
     job = models.CharField(max_length=150)
     name = models.CharField(max_length=200)
-    movies = models.ForeignKey('Movies', on_delete=models.CASCADE)
+    movies = models.ManyToManyField('Movies')
 
     class Meta:
         db_table = "searchindex_crews"

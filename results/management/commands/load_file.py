@@ -1,5 +1,5 @@
 from django.core.management.base import BaseCommand
-from results.models import Movies, MovieGenres, ProductionCompanies
+from results.models import Movies, MovieGenres, ProductionCompanies, Keywords, Casts, Crews
 import pandas as pd
 import numpy as np
 import ast
@@ -9,14 +9,12 @@ class Command(BaseCommand):
     help = "Loads the file into the database."
 
     _accepted_columns = {
-        1: str(['id', 'keywords']),
-        2: str(['cast', 'crew', 'id']),
-        3: str(['adult', 'belongs_to_collection', 'budget', 'genres', 'homepage', 'id',
-                'imdb_id', 'original_language', 'original_title', 'overview',
-                'popularity', 'poster_path', 'production_companies',
-                'production_countries', 'release_date', 'revenue', 'runtime',
-                'spoken_languages', 'status', 'tagline', 'title', 'video',
-                'vote_average', 'vote_count']),
+        1: ['id', 'keywords'],
+        2: ['cast', 'crew', 'id'],
+        3: ['adult', 'belongs_to_collection', 'budget', 'genres', 'homepage', 'id', 'imdb_id', 'original_language',
+            'original_title', 'overview', 'popularity', 'poster_path', 'production_companies', 'production_countries',
+            'release_date', 'revenue', 'runtime', 'spoken_languages', 'status', 'tagline', 'title', 'video',
+            'vote_average', 'vote_count'],
     }
 
     def _check(self, num, file):
@@ -27,10 +25,10 @@ class Command(BaseCommand):
         :return: panda dataframe
         """
         df = pd.read_csv(file, low_memory=False)
-        if str(list(df.columns)) == self._accepted_columns[num]:
+        if list(df.columns) == self._accepted_columns[num]:
             return df.replace({np.nan: ""})
         else:
-            raise Exception('Could not match file.')
+            raise Exception('Could not match file. {}'.format(file.split("\\")[-1]))
 
     def _gen_movies(self, df):
         """
@@ -38,40 +36,63 @@ class Command(BaseCommand):
         :param df: df[['id', 'original_title', 'overview', 'tagline', 'title']]
         :return: None
         """
-        df = df.values.tolist()
-        bc = list(map(lambda x: Movies(id=x[0],
-                                       original_title=x[1],
-                                       overview=x[2],
-                                       tagline=x[3],
-                                       title=x[4]), df))
+        bc = list(map(lambda x: Movies(id=x[1][0],
+                                       original_title=x[1][1],
+                                       overview=x[1][2],
+                                       tagline=x[1][3],
+                                       title=x[1][4]), df.iterrows()))
 
         Movies.objects.bulk_create(bc, ignore_conflicts=True)
 
-    def _gen_movie_m2m(self, df, object):
+    def _gen_movie_m2m(self, df, mobject):
         """
-        Bulk create Movie's m2m relationships (MovieGenres, ProoductionCompanies
+        Bulk create Movie's m2m relationships (MovieGenres, ProoductionCompanies, Keywords)
         :param df: df[['id', 'name']]
-        :param object: Movie's m2m model
+        :param mobject: Movie's m2m model
         :return: None
         """
-        df = df.values.tolist()
-        # Loop df
-        #   each Model in df['field']
-        #       create the Model
-        #       For each created Model, add to Movie's m2m
-        #
-        # len(df) * 3 calls to db ; has to be a better way somehow
-        for m_id, insert in df:
+        # len(df) * 3 = total db queries; has to be a better way
+        for count, item in df.iterrows():
+            m_id, insert = item[0], item[1]
             pc_list = ast.literal_eval(insert)
             pc_id_list = [x['id'] for x in pc_list]
             m_obj = Movies.objects.get(id=int(m_id))
-            bc = list(map(lambda x: object(id=x['id'], name=x['name']), pc_list))
+            bc = list(map(lambda x: mobject(id=x['id'], name=x['name']), pc_list))
 
-            object.objects.bulk_create(bc, ignore_conflicts=True)
-            if object == MovieGenres:
-                m_obj.moviegenres_set.add(*object.objects.filter(id__in=pc_id_list))
-            elif object == ProductionCompanies:
-                m_obj.productioncompanies_set.add(*object.objects.filter(id__in=pc_id_list))
+            mobject.objects.bulk_create(bc, ignore_conflicts=True)
+            if mobject == MovieGenres:
+                m_obj.moviegenres_set.add(*mobject.objects.filter(id__in=pc_id_list))
+            elif mobject == ProductionCompanies:
+                m_obj.productioncompanies_set.add(*mobject.objects.filter(id__in=pc_id_list))
+            elif mobject == Keywords:
+                m_obj.keywords_set.add(*mobject.objects.filter(id__in=pc_id_list))
+
+    def _gen_credits(self, df):
+        """
+        Bulk create Cast and Crew
+        :param df: df[['id', 'cast', 'crew']]
+        :return: None
+        """
+        for count, item in df.iterrows():
+            raw_cast, raw_crew, m_id = item[0], item[1], item[2]
+
+            cast_list = ast.literal_eval(raw_cast)
+            crew_list = ast.literal_eval(raw_crew)
+            cast_id_list = [x['id'] for x in cast_list]
+            crew_id_list = [x['id'] for x in crew_list]
+
+            m_obj = Movies.objects.get(id=int(m_id))
+
+            cast_obj = list(map(lambda x: Casts(id=x['id'], character=x['character'], name=x['name']),
+                                cast_list))
+            crew_obj = list(map(lambda x: Crews(id=x['id'], department=x['department'], job=x['job'], name=x['name']),
+                                crew_list))
+
+            Casts.objects.bulk_create(cast_obj, ignore_conflicts=True)
+            Crews.objects.bulk_create(crew_obj, ignore_conflicts=True)
+
+            m_obj.casts_set.add(*Casts.objects.filter(id__in=cast_id_list))
+            m_obj.crews_set.add(*Crews.objects.filter(id__in=crew_id_list))
 
     def add_arguments(self, parser):
         """
@@ -101,8 +122,10 @@ class Command(BaseCommand):
             self._gen_movie_m2m(df_movies[['id', 'genres']], MovieGenres)
             # Bulk create ProductionCompanies
             self._gen_movie_m2m(df_movies[['id', 'production_companies']], ProductionCompanies)
-
-            print("Success")
+            # Bulk create Keywords
+            self._gen_movie_m2m(df_keywords, Keywords)
+            # Bulk create credits
+            self._gen_credits(df_credits)
 
         except Exception as e:
-            print(e)
+            pass
