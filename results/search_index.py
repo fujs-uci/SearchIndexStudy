@@ -1,8 +1,8 @@
-from .models import SearchIndex, Movies, MovieGenres, ProductionCompanies, Casts, Crews, Keywords
-import re
+from .models import SearchIndex, Movies
 import json
 import time
-from decimal import Decimal as D
+from decimal import Decimal as _d, Context, ROUND_05UP
+from math import log
 
 
 class WordProcessor:
@@ -48,7 +48,7 @@ class WordProcessor:
 
 class SearchIndexWrapper:
     """
-    Search Index handler:
+    Search Index Wrapper:
         create the index
         calibrate the index
         return ranked results
@@ -90,6 +90,7 @@ class SearchIndexWrapper:
         self.search_index = self._create_or_get()
         self.search_index.set_alpha(self._default_alpha())
         self.process = WordProcessor(k=3)
+        self.total_movies = Movies.objects.coutn()
 
     def _tf(self, term_list):
         """
@@ -103,7 +104,7 @@ class SearchIndexWrapper:
             tf_scores[x] = tf_scores[x] + 1 if tf_scores.get(x) else tf_scores[x] = 1
 
         for x, y in tf_scores.items():
-            tf_scores[x] = "{}".format(D(y)/D(len(term_list)))
+            tf_scores[x] = "{}".format(_d(y)/_d(len(term_list)))
 
         return tf_scores
 
@@ -140,22 +141,73 @@ class SearchIndexWrapper:
             term_freq_dict[movie.id] = movie_alpha
         self.search_index.set_term_freq(json.dumps(term_freq_dict))
 
-
     def gen_doc_freq(self):
         """
         For each term, count how many movies contains this term
-        DF(movie, term) = Total movies / (# of movies with term + 1)
+        DF(movie, term) = Total movies / (# of movies with term + 1)\
+        IDF(movie, term) = log(Df(movie,term))
+        doc_freq_dict = {   term_1: DF(),
+                            term_2: ...
+                        }
         :return None
         """
-        pass
+
+        # Loading term freq since it contains a corpus with k-phrases
+        term_freq = json.loads(self.search_index.get_term_freq())
+        df_dict = dict()
+        for movie in term_freq:
+            # Collapse the dict so that for each movie, we have a set of unique k-phrases
+            movie_alpha = set(term_freq[movie].values())
+            # For each k-phrase, add it into df_dict as a key
+            # and as a value keep count how many times it appears
+            for term in movie_alpha:
+                df_dict[term] = df_dict[term] + 1 if df_dict.get(term) else 1
+
+        # df_dict should be populated with every unique k-phrase and the number movies that contain it
+        # Calculate the IDF() = log(total movies / documents with term + 1)
+        for term in df_dict:
+            df_dict[term] = log(_d(self.total_movies)/_d(df_dict[term]))
+
+        self.search_index.set_doc_freq(json.dumps(df_dict))
 
     def gen_tfidf(self):
         """
         For every term, create a dict of movies and their tf-idf score
         TFIDF(movie, term) = TF(movie, term) * log(DF(movie,term))
+        tfidf_dict = {  term_1:
+                            {   movie_1: TFIDF(),
+                                movie_2: ...
+                            },
+                        term_2: ...
+                    }
         :return None
         """
-        pass
+        doc_freq = self.search_index.get_doc_freq()
+        term_freq = self.search_index.get_term_freq()
+        alpha_dict = self.search_index.get_alpha()
+        dec_con = Context(prec=6, rounding=ROUND_05UP)
+
+        # Create a tfidf_dict to hold each term's tf-idf index of movies it appears in
+        tfidf_dict = dict()
+        for term in doc_freq:
+            tfidf_dict[term] = dict()
+
+        # Generate the tf-idf score for each movie and place them in the tfidf_dict
+        for movie in term_freq:
+            for alpha in term_freq[movie]:
+                for term in term_freq[movie][alpha]:
+                    # we are getting every term's individual score that corresponds to a movie
+                    term_tf = _d(term_freq[movie][alpha][term])
+                    term_idf = _d(doc_freq[term])
+                    term_alpha = _d(alpha_dict[alpha])
+                    # generate the term's score for the movie it appears in
+                    term_tf_idf = term_tf * term_idf * term_alpha
+                    # add this score to a tfidf dict that we can use to rank
+                    tfidf_dict[term][movie] = str(_d(tfidf_dict[term][movie]) + term_tf_idf) if \
+                        tfidf_dict[term].get(movie) else \
+                        str(term_tf_idf)
+
+        self.search_index.set_tfidf(json.dumps(tfidf_dict))
 
     def calibrate(self):
         """
@@ -178,6 +230,21 @@ class SearchIndexWrapper:
         print("{}\n\tTF-IDF\n{}".format("#" * 30, "#" * 30))
         self.gen_tfidf()
         print("Finished TF-IDF: {}".format(time.time() - start_time))
+
+    def lookup(self, query):
+        """
+        Given a query, return ranked results
+        :param query: a str
+        :return: sorted list of Movies
+        """
+        # extract the tfidf dict from search index
+        # results_dict(key = movies, value = sum of returned scores)
+        # for each k-phrase in the query
+        #   tfidf[k-phrase] = dict of movies and scores
+        #   for movie in tfidf[k-phrase]
+        #       results_dict[movie] += tfidf[k-phrase][movie]
+        # return results_dict sorted by score
+        pass
 
 
 search_index = SearchIndexWrapper()

@@ -78,6 +78,7 @@ class Movies(models.Model):
         name = movie_keywords.values_list('name', flat=True)
         return list(name)
 
+
 class MovieGenres(models.Model):
     """
     movies_metadata.genres

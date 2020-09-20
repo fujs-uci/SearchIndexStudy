@@ -165,3 +165,14 @@ class CommandsTestCase(TransactionTestCase):
 
         self.assertIsNot(m_cast.count(), 0)
         self.assertIsNot(m_crew.count(), 0)
+
+
+##############################
+#   Test Search Index Wrapper
+##############################
+class SearchIndexTestCase(TestCase):
+    """
+    Test search_index.py
+    """
+    pass
+
