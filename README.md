@@ -6,6 +6,8 @@
 
 2. Develop a better understanding of Pandas
 
+3. Develop a better understanding of processing large data efficiently
+
 # Tools
 Django, Bootstrap, Pandas
 
