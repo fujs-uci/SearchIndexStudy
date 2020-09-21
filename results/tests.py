@@ -1,6 +1,7 @@
 from django.core.management import call_command
 from django.test import TestCase, TransactionTestCase
-from results.models import Movies, MovieGenres, ProductionCompanies, Keywords
+from results.models import Movies, MovieGenres, ProductionCompanies, Keywords, SearchIndex
+from results.search_index import SearchIndexWrapper
 from os import path
 
 
@@ -169,10 +170,40 @@ class CommandsTestCase(TransactionTestCase):
 
 ##############################
 #   Test Search Index Wrapper
+#   and Calibrate command
 ##############################
-class SearchIndexTestCase(TestCase):
+class SearchIndexTestCase(TransactionTestCase):
     """
     Test search_index.py
     """
-    pass
+    def setUp(self):
+        args = [
+            '--movies=C:\\Users\\fujus\\Documents\\searchindex_project\\dataset\\movies_metadata_test.csv',
+            '--keywords=C:\\Users\\fujus\\Documents\\searchindex_project\\dataset\\keywords_test.csv',
+            '--credits=C:\\Users\\fujus\\Documents\\searchindex_project\\dataset\\credits_test.csv'
+        ]
+        opts = {}
+        call_command('load_file', *args, **opts)
+        self.index = SearchIndexWrapper()
+        self.search_index = SearchIndex.objects.all()
+
+    def test_search_index(self):
+        """
+        Test search index object in db
+        :return: None
+        """
+        self.assertEquals(self.search_index.count(), 1)
+        self.assertEquals(self.index.search_index, self.search_index.first())
+
+    def test_search_index_calibrate(self):
+        """
+        Test calibrate
+        :return: None
+        """
+        search_index_obj = self.search_index.first()
+        self.index.calibrate()
+        self.assertIsNot(search_index_obj.get_term_freq(), dict())
+        self.assertIsNot(search_index_obj.get_doc_freq(), dict())
+        self.assertIsNot(search_index_obj.get_tfidf(), dict())
+
 

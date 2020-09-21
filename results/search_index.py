@@ -40,10 +40,23 @@ class WordProcessor:
         for k in range(self.k):
             index = 0
             while index + k + 1 <= len(corpus_remove_stop):
-                k_phrases.append(corpus_remove_stop[index:index + k + 1])
+                k_phrases.append(" ".join(corpus_remove_stop[index:index + k + 1]))
                 index += 1
 
         return k_phrases
+
+    def tokenize_character(self, list_corpus):
+        """
+        Character names are iconic and offer a lot of valuable information
+        Processing the list of names separately
+        For each name, remove useless info and get combination of name
+        ie. remove "(voice)"; "buzz lightyear" should be ["buzz", "lightyear", "buzz lightyear"]
+            "Dr. some name" = ["some", "name", "some name", "dr. some name"]
+            same with Mr. Mrs. etc
+        :param list_corpus: list of str
+        :return: list of string
+        """
+        pass
 
 
 class SearchIndexWrapper:
@@ -90,7 +103,7 @@ class SearchIndexWrapper:
         self.search_index = self._create_or_get()
         self.search_index.set_alpha(self._default_alpha())
         self.process = WordProcessor(k=3)
-        self.total_movies = Movies.objects.coutn()
+        self.total_movies = Movies.objects.count()
 
     def _tf(self, term_list):
         """
@@ -100,11 +113,12 @@ class SearchIndexWrapper:
         """
         # Can use collection.counter, but I want to implement counter
         tf_scores = dict()
+        dec_con = Context(prec=6, rounding=ROUND_05UP)
         for x in term_list:
-            tf_scores[x] = tf_scores[x] + 1 if tf_scores.get(x) else tf_scores[x] = 1
+            tf_scores[x] = tf_scores[x] + 1 if tf_scores.get(x) else 1
 
         for x, y in tf_scores.items():
-            tf_scores[x] = "{}".format(_d(y)/_d(len(term_list)))
+            tf_scores[x] = "{}".format(dec_con.create_decimal(_d(y)/_d(len(term_list))))
 
         return tf_scores
 
@@ -153,11 +167,12 @@ class SearchIndexWrapper:
         """
 
         # Loading term freq since it contains a corpus with k-phrases
-        term_freq = json.loads(self.search_index.get_term_freq())
+        term_freq = self.search_index.get_term_freq()
         df_dict = dict()
+        dec_con = Context(prec=6, rounding=ROUND_05UP)
         for movie in term_freq:
             # Collapse the dict so that for each movie, we have a set of unique k-phrases
-            movie_alpha = set(term_freq[movie].values())
+            movie_alpha = set(y for x in term_freq[movie].values() for y in x.keys())
             # For each k-phrase, add it into df_dict as a key
             # and as a value keep count how many times it appears
             for term in movie_alpha:
@@ -166,7 +181,8 @@ class SearchIndexWrapper:
         # df_dict should be populated with every unique k-phrase and the number movies that contain it
         # Calculate the IDF() = log(total movies / documents with term + 1)
         for term in df_dict:
-            df_dict[term] = log(_d(self.total_movies)/_d(df_dict[term]))
+            dec_df_score = dec_con.create_decimal(log(_d(self.total_movies)/_d(df_dict[term])))
+            df_dict[term] = str(dec_df_score)
 
         self.search_index.set_doc_freq(json.dumps(df_dict))
 
@@ -203,18 +219,18 @@ class SearchIndexWrapper:
                     # generate the term's score for the movie it appears in
                     term_tf_idf = term_tf * term_idf * term_alpha
                     # add this score to a tfidf dict that we can use to rank
-                    tfidf_dict[term][movie] = str(_d(tfidf_dict[term][movie]) + term_tf_idf) if \
+                    sum_term_tfidf = _d(tfidf_dict[term][movie]) + term_tf_idf if \
                         tfidf_dict[term].get(movie) else \
-                        str(term_tf_idf)
+                        term_tf_idf
+                    tfidf_dict[term][movie] = str(dec_con.create_decimal(sum_term_tfidf))
 
         self.search_index.set_tfidf(json.dumps(tfidf_dict))
 
     def calibrate(self):
         """
         Generate the term_freq, doc_freq, and tfidf. Store results as string in DB
-        :return: None
+        :return: boolean
         """
-
         # Gen term freq
         start_time = time.time()
         print("{}\n\tTerm Frequency\n{}".format("#"*30, "#"*30))
@@ -245,6 +261,3 @@ class SearchIndexWrapper:
         #       results_dict[movie] += tfidf[k-phrase][movie]
         # return results_dict sorted by score
         pass
-
-
-search_index = SearchIndexWrapper()
