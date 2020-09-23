@@ -50,13 +50,13 @@ class WordProcessor:
         Character names are iconic and offer a lot of valuable information
         Processing the list of names separately
         For each name, remove useless info and get combination of name
-        ie. remove "(voice)"; "buzz lightyear" should be ["buzz", "lightyear", "buzz lightyear"]
-            "Dr. some name" = ["some", "name", "some name", "dr. some name"]
-            same with Mr. Mrs. etc
         :param list_corpus: list of str
         :return: list of string
         """
-        pass
+        k_phrases = []
+        for name in list_corpus:
+            k_phrases += self.tokenize(name)
+        return k_phrases
 
 
 class SearchIndexWrapper:
@@ -66,7 +66,6 @@ class SearchIndexWrapper:
         calibrate the index
         return ranked results
     """
-
     @staticmethod
     def _create_or_get():
         """
@@ -147,7 +146,7 @@ class SearchIndexWrapper:
                 '2': self._tf(self.process.tokenize(movie.overview)),  # Movie.overview
                 '3': self._tf(self.process.tokenize(movie.tagline)),  # Movie.tagline
                 '4': self._tf(movie.get_genres()),  # Genre.name
-                '6': self._tf(cast_char),  # Cast.character
+                '6': self._tf(self.process.tokenize_character(cast_char)),  # Cast.character
                 '7': self._tf(cast_name),  # Cast.name
                 '8': self._tf(movie.get_crew()),  # Crew.name
                 '9': self._tf(movie.get_keyword()),  # Keyword.name
@@ -226,26 +225,34 @@ class SearchIndexWrapper:
 
         self.search_index.set_tfidf(json.dumps(tfidf_dict))
 
-    def calibrate(self):
+    def calibrate(self, print_info=False):
         """
         Generate the term_freq, doc_freq, and tfidf. Store results as string in DB
         :return: boolean
         """
+        print_info_str = ""
+
         # Gen term freq
         start_time = time.time()
-        print("{}\n\tTerm Frequency\n{}".format("#"*30, "#"*30))
+        print_info_str += "{}\n\tTerm Frequency\n{}".format("#"*30, "#"*30)
         self.gen_term_freq()
-        print("Finished Term Frequency: {}".format(time.time()-start_time))
+        print_info_str += "Finished Term Frequency: {}".format(time.time()-start_time)
+
         # Gen doc freq
         start_time = time.time()
-        print("{}\n\tDoc Frequency\n{}".format("#" * 30, "#" * 30))
+        print_info_str += "{}\n\tDoc Frequency\n{}".format("#" * 30, "#" * 30)
         self.gen_doc_freq()
-        print("Finished Doc Frequency: {}".format(time.time() - start_time))
+        print_info_str += "Finished Doc Frequency: {}".format(time.time() - start_time)
+
         # Gen TFIDF
         start_time = time.time()
-        print("{}\n\tTF-IDF\n{}".format("#" * 30, "#" * 30))
+        print_info_str += "{}\n\tTF-IDF\n{}".format("#" * 30, "#" * 30)
         self.gen_tfidf()
-        print("Finished TF-IDF: {}".format(time.time() - start_time))
+        print_info_str += "Finished TF-IDF: {}".format(time.time() - start_time)
+
+        # Print info
+        if print_info:
+            print(print_info_str)
 
     def lookup(self, query):
         """

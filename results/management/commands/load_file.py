@@ -18,10 +18,6 @@ class Command(BaseCommand):
             'vote_average', 'vote_count'],
     }
 
-    def _print_iter_count(self, count):
-        if count % 10000 == 0:
-            print("--- {} count".format(count))
-
     def _check(self, num, file):
         """
         3 specific Dataset files are required to run this application
@@ -58,7 +54,6 @@ class Command(BaseCommand):
         """
         # len(df) * 3 = total db queries; has to be a better way
         for count, item in df.iterrows():
-            self._print_iter_count(count)
             m_id, insert = item[0], item[1]
             pc_list = ast.literal_eval(insert)
             pc_id_list = [x['id'] for x in pc_list]
@@ -110,6 +105,7 @@ class Command(BaseCommand):
         parser.add_argument('--movies', nargs='?', required=True, help='movies_metadata.csv')
         parser.add_argument('--keywords', nargs='?', required=True, help='keywords.csv')
         parser.add_argument('--credits', nargs='?', required=True, help='credits.csv')
+        parser.add_argument('--print', required=False, action='store_true', help='print details')
 
     def handle(self, *args, **options):
         """
@@ -122,41 +118,47 @@ class Command(BaseCommand):
             df_movies = self._check(3, options['movies'])
             df_keywords = self._check(1, options['keywords'])
             df_credits = self._check(2, options['credits'])
+            print_info = options.get('print')
 
+            print_info_str = ""
             # Bulk create Movies
-            print("{}\n\tStart Movies\n{}".format("#"*30, "#"*30))
+            print_info_str += "{}\n\tStart Movies\n{}".format("#"*30, "#"*30)
             start_bc = time.time()
             self._gen_movies(df_movies[['id', 'original_title', 'overview', 'tagline', 'title']])
             finish_movies_bc = time.time() - start_bc
-            print("Finished Movies: {}".format(finish_movies_bc))
+            print_info_str += "Finished Movies: {}".format(finish_movies_bc)
 
             # Bulk create MovieGenres
-            print("{}\n\tStart MovieGenres\n{}".format("#"*30, "#"*30))
+            print_info_str += "{}\n\tStart MovieGenres\n{}".format("#"*30, "#"*30)
             start_bc = time.time()
             self._gen_movie_m2m(df_movies[['id', 'genres']], MovieGenres)
             finish_moviegenres_bc = time.time() - start_bc
-            print("Finished MovieGenres: {}".format(finish_moviegenres_bc))
+            print_info_str += "Finished MovieGenres: {}".format(finish_moviegenres_bc)
 
             # Bulk create ProductionCompanies
-            print("{}\n\tStart ProdComp\n{}".format("#"*30, "#"*30))
+            print_info_str += "{}\n\tStart ProdComp\n{}".format("#"*30, "#"*30)
             start_bc = time.time()
             self._gen_movie_m2m(df_movies[['id', 'production_companies']], ProductionCompanies)
             finish_prodcomp_bc = time.time() - start_bc
-            print("Finished ProdComp: {}".format(finish_prodcomp_bc))
+            print_info_str += "Finished ProdComp: {}".format(finish_prodcomp_bc)
 
             # Bulk create Keywords
-            print("{}\n\tStart Keywords\n{}".format("#"*30, "#"*30))
+            print_info_str += "{}\n\tStart Keywords\n{}".format("#"*30, "#"*30)
             start_bc = time.time()
             self._gen_movie_m2m(df_keywords, Keywords)
             finish_keywords_bc = time.time() - start_bc
-            print("Finished Keywords: {}".format(finish_keywords_bc))
+            print_info_str += "Finished Keywords: {}".format(finish_keywords_bc)
 
             # Bulk create credits
-            print("{}\n\tStart Credits\n{}".format("#"*30, "#"*30))
+            print_info_str += "{}\n\tStart Credits\n{}".format("#"*30, "#"*30)
             start_bc = time.time()
             self._gen_credits(df_credits)
             finish_credits_bc = time.time() - start_bc
-            print("Finished Credits: {}".format(finish_credits_bc))
+            print_info_str += "Finished Credits: {}".format(finish_credits_bc)
+
+            # Print info
+            if print_info:
+                print(print_info_str)
 
         except Exception as e:
             pass
