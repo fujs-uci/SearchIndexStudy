@@ -226,7 +226,6 @@ class CommandsTestCase(TransactionTestCase):
 
 ##############################
 #   Test Search Index Wrapper
-#   and Calibrate command
 ##############################
 class SearchIndexTestCase(TransactionTestCase):
     """
@@ -268,5 +267,12 @@ class SearchIndexTestCase(TransactionTestCase):
         Test search index lookup
         :return: None
         """
-        search_index_obj = SearchIndex.objects.get(id=1)
-        pass
+        # Search Title
+        results_title = self.index.lookup("Toy Story")
+        self.assertEquals(results_title, ['862'])
+        # Search Character
+        results_character = self.index.lookup("buzz lightyear")
+        self.assertEquals(results_character, ['862'])
+        # Search Actor Name
+        results_actor = self.index.lookup("Tom Hanks")
+        self.assertEquals(results_actor, ['862'])

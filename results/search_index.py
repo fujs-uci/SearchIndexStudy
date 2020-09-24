@@ -7,8 +7,7 @@ from math import log
 
 class WordProcessor:
     """
-    Enter in a corpus
-    return a list of k-phrases
+    Processing Text, removing speial characters and generating k-phrases
     """
 
     def __init__(self, k):
@@ -24,37 +23,37 @@ class WordProcessor:
                            'tis', 'to', 'too', 'twas', 'us', 'wants', 'was', 'we', 'were', 'what', 'when', 'where',
                            'which', 'while', 'who', 'whom', 'why', 'will', 'with', 'would', 'yet', 'you', 'your']
 
-    def tokenize(self, corpus):
+    def tokenize(self, text):
         """
-        Split the corpus by words, removing special characters & stop words
+        Split the text by words, removing special characters & stop words
         generate addition k-phrases added to list, order matters
-        len(corpus) = # words
-        :param corpus: str
+        len(text) = # words
+        :param text: str
         :return: list of str
         """
         # Gonna do a ugly brute force method for the sake of getting this done
         k_phrases = []
-        corpus_remove_stop = ["".join(char for char in word if char.isalnum()).lower()
-                              for word in corpus.split(" ")
-                              if word not in self.stop_words]
+        text_remove_stop = ["".join(char for char in word if char.isalnum()).lower()
+                            for word in text.split(" ")
+                            if word not in self.stop_words]
         for k in range(self.k):
             index = 0
-            while index + k + 1 <= len(corpus_remove_stop):
-                k_phrases.append(" ".join(corpus_remove_stop[index:index + k + 1]))
+            while index + k + 1 <= len(text_remove_stop):
+                k_phrases.append(" ".join(text_remove_stop[index:index + k + 1]))
                 index += 1
 
         return k_phrases
 
-    def tokenize_character(self, list_corpus):
+    def tokenize_character(self, list_text):
         """
         Character names are iconic and offer a lot of valuable information
         Processing the list of names separately
         For each name, remove useless info and get combination of name
-        :param list_corpus: list of str
+        :param list_text: list of str
         :return: list of string
         """
         k_phrases = []
-        for name in list_corpus:
+        for name in list_text:
             k_phrases += self.tokenize(name)
         return k_phrases
 
@@ -66,6 +65,12 @@ class SearchIndexWrapper:
         calibrate the index
         return ranked results
     """
+    def __init__(self):
+        self.search_index = self._create_or_get()
+        self.search_index.set_alpha(self._default_alpha())
+        self.process = WordProcessor(k=3)
+        self.total_movies = Movies.objects.count()
+
     @staticmethod
     def _create_or_get():
         """
@@ -98,12 +103,6 @@ class SearchIndexWrapper:
         }
         return json.dumps(alpha)
 
-    def __init__(self):
-        self.search_index = self._create_or_get()
-        self.search_index.set_alpha(self._default_alpha())
-        self.process = WordProcessor(k=3)
-        self.total_movies = Movies.objects.count()
-
     def _tf(self, term_list):
         """
         turn the list into a dict where key = term and value = tf score
@@ -114,10 +113,14 @@ class SearchIndexWrapper:
         tf_scores = dict()
         dec_con = Context(prec=6, rounding=ROUND_05UP)
         for x in term_list:
-            tf_scores[x] = tf_scores[x] + 1 if tf_scores.get(x) else 1
+            if len(x) == 0 or len(x) == 1:
+                continue
+            term = x.lower()
+            tf_scores[term] = tf_scores[term] + 1 if tf_scores.get(term) else 1
 
         for x, y in tf_scores.items():
-            tf_scores[x] = "{}".format(dec_con.create_decimal(_d(y)/_d(len(term_list))))
+            term = x.lower()
+            tf_scores[term] = "{}".format(dec_con.create_decimal(_d(y) / _d(len(term_list))))
 
         return tf_scores
 
@@ -180,7 +183,7 @@ class SearchIndexWrapper:
         # df_dict should be populated with every unique k-phrase and the number movies that contain it
         # Calculate the IDF() = log(total movies / documents with term + 1)
         for term in df_dict:
-            dec_df_score = dec_con.create_decimal(log(_d(self.total_movies)/_d(df_dict[term])))
+            dec_df_score = dec_con.create_decimal(log(_d(self.total_movies) / _d(df_dict[term])))
             df_dict[term] = str(dec_df_score)
 
         self.search_index.set_doc_freq(json.dumps(df_dict))
@@ -234,9 +237,9 @@ class SearchIndexWrapper:
 
         # Gen term freq
         start_time = time.time()
-        print_info_str += "{}\n\tTerm Frequency\n{}".format("#"*30, "#"*30)
+        print_info_str += "{}\n\tTerm Frequency\n{}".format("#" * 30, "#" * 30)
         self.gen_term_freq()
-        print_info_str += "Finished Term Frequency: {}".format(time.time()-start_time)
+        print_info_str += "Finished Term Frequency: {}".format(time.time() - start_time)
 
         # Gen doc freq
         start_time = time.time()
@@ -258,13 +261,20 @@ class SearchIndexWrapper:
         """
         Given a query, return ranked results
         :param query: a str
-        :return: sorted list of Movies
+        :return: sorted list of Movie ids
         """
-        # extract the tfidf dict from search index
-        # results_dict(key = movies, value = sum of returned scores)
-        # for each k-phrase in the query
-        #   tfidf[k-phrase] = dict of movies and scores
-        #   for movie in tfidf[k-phrase]
-        #       results_dict[movie] += tfidf[k-phrase][movie]
-        # return results_dict sorted by score
-        pass
+        # get the tf-idf index
+        index = self.search_index.get_tfidf()
+        # create the ranked results
+        ranked_results = dict()
+        # tokenize the query
+        for term in self.process.tokenize(query):
+            movie_term_results = index.get(term)
+            if movie_term_results:
+                for movie, score in movie_term_results.items():
+                    # for every movie that appears for the query, collect the tf-idf score
+                    ranked_results[movie] = _d(ranked_results[movie]) + _d(score) if \
+                        ranked_results.get(movie) else \
+                        _d(score)
+        # return a list of movie ids sorted by tf-idf score
+        return sorted(ranked_results, key=lambda x: ranked_results.get(x))

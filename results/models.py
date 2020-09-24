@@ -44,6 +44,12 @@ class SearchIndex(models.Model):
         self.alpha = alpha
         self.save()
 
+    def is_calibrated(self):
+        check1 = self.get_term_freq()
+        check2 = self.get_doc_freq()
+        check3 = self.get_tfidf()
+        return all([len(check1) > 0, len(check2) > 0, len(check3) > 0])
+
 
 class Movies(models.Model):
     """

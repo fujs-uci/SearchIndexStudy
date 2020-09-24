@@ -75,7 +75,6 @@ class Command(BaseCommand):
         :return: None
         """
         for count, item in df.iterrows():
-            self._print_iter_count(count)
             raw_cast, raw_crew, m_id = item[0], item[1], item[2]
 
             cast_list = ast.literal_eval(raw_cast)
