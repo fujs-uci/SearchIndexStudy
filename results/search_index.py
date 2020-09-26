@@ -257,9 +257,10 @@ class SearchIndexWrapper:
         if print_info:
             print(print_info_str)
 
-    def lookup(self, query):
+    def lookup(self, query, limit=None):
         """
         Given a query, return ranked results
+        :param limit: an int that limits the result amount
         :param query: a str
         :return: sorted list of Movie ids
         """
@@ -273,8 +274,8 @@ class SearchIndexWrapper:
             if movie_term_results:
                 for movie, score in movie_term_results.items():
                     # for every movie that appears for the query, collect the tf-idf score
-                    ranked_results[movie] = _d(ranked_results[movie]) + _d(score) if \
-                        ranked_results.get(movie) else \
+                    ranked_results[int(movie)] = _d(ranked_results[int(movie)]) + _d(score) if \
+                        ranked_results.get(int(movie)) else \
                         _d(score)
         # return a list of movie ids sorted by tf-idf score
-        return sorted(ranked_results, key=lambda x: ranked_results.get(x))
+        return sorted(ranked_results, key=lambda x: ranked_results.get(x), reverse=True)[:limit]
