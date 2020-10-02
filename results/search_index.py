@@ -68,7 +68,7 @@ class SearchIndexWrapper:
     def __init__(self):
         self.search_index = self._create_or_get()
         self.search_index.set_alpha(self._default_alpha())
-        self.process = WordProcessor(k=3)
+        self.process = WordProcessor(k=1)
         self.total_movies = Movies.objects.count()
 
     @staticmethod

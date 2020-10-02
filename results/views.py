@@ -1,4 +1,6 @@
 from django.shortcuts import render
+from .forms import SearchQuery
+from results.search_index import SearchIndexWrapper
 
 
 def index(request):
@@ -11,4 +13,14 @@ def index(request):
         display results while typing search
         pagination
     """
-    pass
+    search_index = SearchIndexWrapper()
+    search_results = None
+    if request.method == "POST":
+        search_query = SearchQuery(request.POST)
+        search_results = search_index.lookup(search_query['query'].value(), limit=10)
+    else:
+        search_query = SearchQuery()
+    template = "results/index.html"
+    context = {'search_query': search_query,
+               'search_results': search_results,}
+    return render(request, template, context)
