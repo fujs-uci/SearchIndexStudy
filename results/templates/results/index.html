@@ -7,17 +7,34 @@
           integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
 </head>
 <body>
-<div class="d-flex bg-secondary" style="height: 100vh;">
-    <div class="row m-auto bg-light h-50">
-        <div class="col-12 p-2">
-            <form method="post">
-                {% csrf_token %}
-                {{ search_query }}
-                <button type="submit">Submit</button>
-            </form>
-        </div>
-        <div class="col-12 p-2">
-            {{ search_results }}
+<div class="bg-secondary" style="height: 100vh;">
+    <div class="container d-flex h-100">
+        <div class="row bg-light h-50 w-100 rounded m-auto">
+            <div class="col p-2 text-centered">
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="form-row align-items-center">
+                        <div class="col">
+                            <label class="sr-only" for={{ search_query.query.id_for_label }}>Username</label>
+                            <div class="input-group mb-2">
+                                <input type="text" class="form-control" id={{ search_query.query.id_for_label }}
+                                        placeholder="Search" required="" name="query">
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <button type="submit" class="btn btn-primary mb-2">Submit</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="col-12 p-2" style="overflow-y: scroll; height: 80%;">
+                <ul class="list-group">
+                    {% for movie in search_results %}
+                        <li class="list-group-item">{{ movie.title }}</li>
+                    {% empty %}
+                    {% endfor %}
+                </ul>
+            </div>
         </div>
     </div>
 </div>
